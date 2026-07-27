@@ -1,0 +1,25 @@
+{$SITE_ADDRESS:http://localhost} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: https:; connect-src 'self' https://*.mapillary.com https://graph.mapillary.com https://*.fbcdn.net https://*.tiles.mapbox.com https://demotiles.maplibre.org https://tiles.openfreemap.org; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; worker-src 'self' blob:"
+		-Server
+	}
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /health/* {
+		reverse_proxy backend:8000
+	}
+	handle {
+		reverse_proxy frontend:8080
+	}
+	log {
+		output stdout
+		format json
+	}
+}

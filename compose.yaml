@@ -1,0 +1,137 @@
+name: worldguessr
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-worldguessr}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-worldguessr}
+  REDIS_URL: redis://redis:6379/0
+  SIGNING_SECRET: ${SIGNING_SECRET:?set SIGNING_SECRET}
+  PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost}
+  ENVIRONMENT: ${ENVIRONMENT:-production}
+  MAPILLARY_CLIENT_TOKEN: ${MAPILLARY_CLIENT_TOKEN:-}
+  MAPILLARY_GRAPH_TOKEN: ${MAPILLARY_GRAPH_TOKEN:-}
+  MAP_STYLE_URL: ${MAP_STYLE_URL:-https://tiles.openfreemap.org/styles/liberty}
+  MAP_ATTRIBUTION: ${MAP_ATTRIBUTION:-© OpenFreeMap © OpenMapTiles Data from OpenStreetMap}
+  COUNTRY_POOL_TARGET: ${COUNTRY_POOL_TARGET:-200}
+  COUNTRY_POOL_MINIMUM: ${COUNTRY_POOL_MINIMUM:-25}
+  ELIGIBLE_COUNTRY_MINIMUM: ${ELIGIBLE_COUNTRY_MINIMUM:-10}
+  RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
+  ALLOW_DEMO_CATALOG: ${ALLOW_DEMO_CATALOG:-false}
+
+services:
+  caddy:
+    image: docker.io/library/caddy:2.9-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-http://localhost}
+    ports:
+      - "${HTTP_PORT:-3000}:80"
+      - "${HTTPS_PORT:-3443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,Z
+      - ./.volumes/caddy-data:/data:Z
+      - ./.volumes/caddy-config:/config:Z
+    depends_on:
+      frontend: { condition: service_healthy }
+      backend: { condition: service_healthy }
+    networks: [edge]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [edge]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    restart: unless-stopped
+    environment: *app-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [edge, internal]
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    environment: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [internal]
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    restart: unless-stopped
+    command: ["arq", "app.worker.WorkerSettings"]
+    environment: *app-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    # The worker needs outbound access to discover Mapillary imagery.
+    networks: [edge, internal]
+
+  postgres:
+    image: docker.io/postgis/postgis:17-3.5-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-worldguessr}
+      POSTGRES_USER: ${POSTGRES_USER:-worldguessr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - ./.volumes/postgres:/var/lib/postgresql/data:Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [internal]
+
+  redis:
+    image: docker.io/library/redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "192mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - ./.volumes/redis:/data:Z
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [internal]
+
+  backup:
+    image: docker.io/library/postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-worldguessr}
+      PGUSER: ${POSTGRES_USER:-worldguessr}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - ./.volumes/backups:/backups:Z
+      - ./ops/backup.sh:/usr/local/bin/backup:ro,Z
+    command: ["/bin/sh", "-c", "while true; do /usr/local/bin/backup; sleep 86400; done"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [internal]
+
+networks:
+  edge:
+  internal:
+    internal: true
