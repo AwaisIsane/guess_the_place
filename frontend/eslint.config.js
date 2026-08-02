@@ -6,5 +6,5 @@ export default tseslint.config(
   { ignores: ["dist", "src/generated"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  reactHooks.configs["recommended-latest"],
+  reactHooks.configs.flat["recommended-latest"],
 );

@@ -1,6 +1,6 @@
 .PHONY: setup lint test build contract docs-check infra-plan deploy destroy
 setup:
-	cd backend && uv sync --extra dev
+	cd backend && uv sync --extra dev --locked
 	cd frontend && npm ci
 lint:
 	cd backend && uv run ruff check app tests

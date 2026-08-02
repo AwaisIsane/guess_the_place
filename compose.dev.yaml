@@ -6,12 +6,12 @@ services:
   frontend:
     build:
       target: development
-    command: ["sh", "-c", "npm install && npm run dev -- --port 8080"]
+    command: ["sh", "-c", "npm ci && npm run dev -- --port 8080"]
     environment:
       CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./frontend:/app:Z
-      - frontend-node-modules:/app/node_modules
+      - ./.volumes/frontend-node-modules:/app/node_modules:Z
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
 
@@ -36,6 +36,3 @@ services:
   worker:
     command: ["watchfiles", "--filter", "python", "arq app.worker.WorkerSettings", "/app/app"]
     volumes: *backend-source
-
-volumes:
-  frontend-node-modules:

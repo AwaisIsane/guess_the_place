@@ -17,7 +17,9 @@ export function MapillaryView({ imageId, accessToken }: Props) {
   const [viewerRevision, setViewerRevision] = useState(0);
   const isDemo = imageId.startsWith("demo-") || !accessToken;
 
-  activeImageId.current = imageId;
+  useEffect(() => {
+    activeImageId.current = imageId;
+  }, [imageId]);
 
   function retry() {
     recoveryAttempts.current = 0;

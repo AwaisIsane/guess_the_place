@@ -9,8 +9,10 @@ frontend/vite.config.d.ts
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+.terraform/
 *.py[cod]
 coverage.xml
+.coverage
 .vitepress/cache
 .vitepress/dist
 docs/.vitepress/cache

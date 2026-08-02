@@ -6,21 +6,22 @@ on:
 permissions: { contents: read }
 jobs:
   application:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgis/postgis:17-3.5
+        image: postgis/postgis:18-3.6
         env: { POSTGRES_PASSWORD: test, POSTGRES_USER: worldguessr, POSTGRES_DB: worldguessr }
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
       redis:
-        image: redis:7.4-alpine
+        image: valkey/valkey:9.1.1-alpine
         ports: ["6379:6379"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v9
+        with: { version: "0.12.1", python-version: "3.14", enable-cache: true }
+      - uses: actions/setup-node@v6
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: uv sync --project backend --extra dev --locked
       - run: uv run --project backend ruff check backend/app backend/tests
       - run: uv run pytest --cov=app
@@ -32,10 +33,12 @@ jobs:
         working-directory: frontend
       - run: make contract && git diff --exit-code
   infrastructure:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform fmt -check -recursive && terraform -chdir=infra/terraform init -backend=false && terraform -chdir=infra/terraform validate
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@v6
+      - uses: hashicorp/setup-terraform@v4
+        with: { terraform_version: 1.15.8 }
+      - run: terraform fmt -check -recursive && terraform -chdir=infra/terraform init -backend=false -lockfile=readonly && terraform -chdir=infra/terraform validate
+      - uses: azure/setup-helm@v5
+        with: { version: v4.2.0 }
       - run: helm lint infra/helm/worldguessr && helm template test infra/helm/worldguessr >/tmp/rendered.yaml

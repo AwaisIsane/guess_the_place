@@ -8,7 +8,7 @@ locals {
 
 module "vpc" {
   source                 = "terraform-aws-modules/vpc/aws"
-  version                = "5.21.0"
+  version                = "6.6.1"
   name                   = local.name
   cidr                   = var.vpc_cidr
   azs                    = local.azs
@@ -25,14 +25,14 @@ module "vpc" {
 
 module "eks" {
   source                                   = "terraform-aws-modules/eks/aws"
-  version                                  = "20.37.2"
-  cluster_name                             = local.name
-  cluster_version                          = "1.32"
-  cluster_endpoint_public_access           = true
+  version                                  = "21.24.0"
+  name                                     = local.name
+  kubernetes_version                       = "1.36"
+  endpoint_public_access                   = true
   enable_cluster_creator_admin_permissions = true
   vpc_id                                   = module.vpc.vpc_id
   subnet_ids                               = module.vpc.private_subnets
-  cluster_addons = {
+  addons = {
     eks-pod-identity-agent = {}
   }
   eks_managed_node_groups = {
@@ -106,7 +106,7 @@ resource "aws_security_group" "data" {
 resource "aws_db_instance" "postgres" {
   identifier                   = local.name
   engine                       = "postgres"
-  engine_version               = "17"
+  engine_version               = "18"
   instance_class               = var.database_instance_class
   allocated_storage            = 20
   max_allocated_storage        = 100
@@ -132,6 +132,7 @@ resource "aws_elasticache_replication_group" "valkey" {
   replication_group_id       = local.name
   description                = "Reconstructible WorldGuessr cache and ARQ queue"
   engine                     = "valkey"
+  engine_version             = "9.1"
   node_type                  = var.cache_node_type
   port                       = 6379
   subnet_group_name          = aws_elasticache_subnet_group.data.name

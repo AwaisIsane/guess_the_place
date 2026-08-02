@@ -18,7 +18,7 @@ x-app-env: &app-env
 
 services:
   caddy:
-    image: docker.io/library/caddy:2.9-alpine
+    image: docker.io/library/caddy:2.11.4-alpine
     restart: unless-stopped
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-http://localhost}
@@ -87,14 +87,14 @@ services:
     networks: [edge, internal]
 
   postgres:
-    image: docker.io/postgis/postgis:17-3.5-alpine
+    image: docker.io/postgis/postgis:18-3.6-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-worldguessr}
       POSTGRES_USER: ${POSTGRES_USER:-worldguessr}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     volumes:
-      - ./.volumes/postgres:/var/lib/postgresql/data:Z
+      - ./.volumes/postgres18:/var/lib/postgresql:Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -103,20 +103,20 @@ services:
     networks: [internal]
 
   redis:
-    image: docker.io/library/redis:7.4-alpine
+    image: docker.io/valkey/valkey:9.1.1-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "192mb", "--maxmemory-policy", "allkeys-lru"]
+    command: ["valkey-server", "--appendonly", "yes", "--maxmemory", "192mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
-      - ./.volumes/redis:/data:Z
+      - ./.volumes/valkey:/data:Z
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 12
     networks: [internal]
 
   backup:
-    image: docker.io/library/postgres:17-alpine
+    image: docker.io/library/postgres:18-alpine
     restart: unless-stopped
     environment:
       PGHOST: postgres

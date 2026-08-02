@@ -43,7 +43,7 @@ class Game(Base):
     total_score: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    rounds: Mapped[list["Round"]] = relationship(
+    rounds: Mapped[list[Round]] = relationship(
         back_populates="game", cascade="all, delete-orphan", order_by="Round.number"
     )
 

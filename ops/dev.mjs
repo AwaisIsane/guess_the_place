@@ -65,6 +65,10 @@ async function clearProjectCaches() {
       recursive: true,
       force: true,
     }),
+    rm(path.join(projectRoot, ".volumes", "frontend-node-modules"), {
+      recursive: true,
+      force: true,
+    }),
     removePythonCaches(path.join(projectRoot, "backend")),
   ]);
 }

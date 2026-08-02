@@ -72,8 +72,8 @@ flowchart LR
   Browser --> Caddy --> React
   Caddy --> API[FastAPI API]
   API --> PG[(PostgreSQL/PostGIS)]
-  API --> Redis[(Redis)]
-  Redis --> Worker[ARQ worker]
+  API --> Valkey[(Valkey)]
+  Valkey --> Worker[ARQ worker]
   Worker --> Mapillary
 ```
 

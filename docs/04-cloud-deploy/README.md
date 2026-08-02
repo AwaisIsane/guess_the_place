@@ -57,8 +57,8 @@ Helm upgrade should not recreate the VPC.
 
 ### Backend image
 
-The backend image starts from Python 3.12 slim, installs the project dependencies, copies
-Alembic and application code, drops to a non-root user, and starts Uvicorn:
+The backend image starts from Python 3.14 slim, installs the exact production dependency set
+from `uv.lock`, copies Alembic and application code, drops to a non-root user, and starts Uvicorn:
 
 ```text
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
@@ -79,8 +79,7 @@ The frontend uses a multi-stage build. Node compiles TypeScript and produces Vit
 runtime stage contains only Nginx and the `dist` directory. Nginx listens on port 8080, serves
 SPA routes through `index.html`, and provides a lightweight `/health` response.
 
-The current build runs `npm install`, not the stricter `npm ci`. Reproducibility relies on the
-lockfile but would be stronger if the container build enforced it.
+The build runs `npm ci`, so dependency installation must match the checked-in lockfile.
 
 ### Immutable image identity
 
@@ -134,7 +133,7 @@ failure at higher monthly cost.
 
 ### EKS
 
-The EKS module creates Kubernetes 1.32, enables the Pod Identity agent, and creates one managed
+The EKS module creates Kubernetes 1.36, enables the Pod Identity agent, and creates one managed
 x86 node group in private subnets. The default node range is one to three `t3.medium`
 instances.
 
@@ -154,7 +153,7 @@ workflow currently starts after those build-and-push steps.
 
 ### RDS PostgreSQL
 
-RDS PostgreSQL 17 stores authoritative game data. The resource enables storage encryption,
+RDS PostgreSQL 18 stores authoritative game data. The resource enables storage encryption,
 starts with 20 GB, permits autoscaling to 100 GB, and lets RDS manage the master password in a
 separate AWS-managed secret.
 
@@ -319,7 +318,7 @@ are allowed and verified.
 
 The CI workflow runs on pull requests and pushes to `main`. It:
 
-- starts PostgreSQL/PostGIS and Redis service containers;
+- starts PostgreSQL/PostGIS and Valkey service containers;
 - installs locked backend dependencies with `uv`;
 - runs Ruff and backend tests with a coverage threshold;
 - installs frontend dependencies and runs lint, tests, and build;
@@ -530,7 +529,7 @@ Before calling a design production-ready, walk every row with evidence rather th
 
 **Containers and infrastructure as code**
 
-- [Docker multi-stage builds](https://docs.docker.com/build/building/multi-stage/) — separating
+- [Podman builds](https://docs.podman.io/en/latest/markdown/podman-build.1.html) — separating
   build dependencies from minimal runtime artifacts.
 - [Terraform language overview](https://developer.hashicorp.com/terraform/language) — resources,
   expressions, modules, and dependency inference.

@@ -7,12 +7,19 @@
 Read it as a searchable documentation site:
 
 ```sh
-npm install
+npm ci
 npm run docs:dev
 ```
 
 A guest-only, five-round world exploration game built with Mapillary, MapLibre, FastAPI,
-PostgreSQL/PostGIS, Redis, and Caddy.
+PostgreSQL/PostGIS, Valkey, and Caddy.
+
+## Supported toolchain
+
+- Node.js 24 LTS with npm 11;
+- Python 3.14 with uv 0.12;
+- Podman 6 with Compose support;
+- Terraform 1.15 and Helm 4 for infrastructure work.
 
 ## Local start
 
@@ -31,8 +38,9 @@ The development-only Caddy configuration permits the inline React-refresh preamb
 connections required by Vite; the stricter production CSP remains unchanged. The development stack
 stays attached so its logs are visible; Ctrl+C stops it.
 
-Use `npm run dev:clean` when you need a completely fresh build. It removes only this Compose
-project's containers, locally built images, and dependency-cache volume; clears generated
+Use `npm run dev:clean` when you need a completely fresh build. It removes only this Podman
+Compose project's containers, locally built images, and `.volumes/frontend-node-modules`
+dependency cache; clears generated
 frontend/Python caches; pulls fresh base images; rebuilds without the layer cache; and launches
 the same hot-reloading development stack. Persistent data in `.volumes/` is not removed.
 
@@ -47,7 +55,7 @@ Point the domain at the VPS, set `PUBLIC_DOMAIN`, `PUBLIC_ORIGIN`, and `SITE_ADD
 HTTPS URL, set `HTTP_PORT=80` and `HTTPS_PORT=443`, and run
 `podman compose up --build -d`. Binding privileged ports in rootless Podman requires the host
 to permit them; alternatively, run the production stack rootfully. Only Caddy publishes ports;
-PostgreSQL and Redis remain on an internal Podman network. All persistent state is beneath
+PostgreSQL and Valkey remain on an internal Podman network. All persistent state is beneath
 `.volumes/`.
 
 Before opening traffic:
@@ -60,7 +68,7 @@ Before opening traffic:
 - verify `/health/live` and `/health/ready`.
 
 The worker prunes expired games and stale provider records. PostgreSQL remains authoritative;
-Redis is limited to queues and reconstructible hot state.
+Valkey is limited to queues and reconstructible hot state.
 
 ## Catalog
 
@@ -71,6 +79,45 @@ demo placeholders from being selected once the real catalog is playable.
 
 The API selects countries uniformly from eligible countries and then chooses a quality-weighted
 location. Recent locations for the guest are excluded where the pool permits.
+
+## Upgrading local PostgreSQL 17 to 18
+
+PostgreSQL 18 uses a different container volume layout. The current Compose configuration mounts
+the new cluster at `.volumes/postgres18` and deliberately leaves the former
+`.volumes/postgres` directory untouched. Do not point PostgreSQL 18 at the old directory.
+
+If the PostgreSQL 17 directory contains data you need, create a logical dump before starting the
+new stack. Stop the old Compose stack, then run the former image against the preserved directory:
+
+```sh
+mkdir -p .volumes/backups
+podman run --rm -d --name worldguessr-pg17-migration --env-file .env \
+  -e POSTGRES_USER="${POSTGRES_USER:-worldguessr}" \
+  -e POSTGRES_DB="${POSTGRES_DB:-worldguessr}" \
+  -v "$PWD/.volumes/postgres:/var/lib/postgresql/data:Z" \
+  docker.io/postgis/postgis:17-3.5-alpine
+podman exec worldguessr-pg17-migration pg_dump \
+  -U "${POSTGRES_USER:-worldguessr}" -d "${POSTGRES_DB:-worldguessr}" -Fc \
+  > .volumes/backups/worldguessr-pg17.dump
+podman stop worldguessr-pg17-migration
+```
+
+Only continue if the dump command succeeds and the dump is non-empty. Start PostgreSQL 18,
+restore into its empty database, and then start the complete stack:
+
+```sh
+podman compose up -d postgres
+podman compose exec -T postgres pg_restore \
+  -U "${POSTGRES_USER:-worldguessr}" -d "${POSTGRES_DB:-worldguessr}" --no-owner \
+  < .volumes/backups/worldguessr-pg17.dump
+podman compose up --build -d
+podman compose exec backend python -c \
+  "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health/ready').status)"
+```
+
+Keep `.volumes/postgres` and the logical dump until row counts, gameplay, and a fresh PostgreSQL
+18 backup have been verified. Valkey queue and rate-limit data is reconstructible and therefore
+starts in the new `.volumes/valkey` directory.
 
 ## Backups and restore
 
@@ -94,17 +141,16 @@ Backend:
 
 ```sh
 cd backend
-python -m venv .venv && . .venv/bin/activate
-pip install -e '.[dev]'
-DATABASE_URL=sqlite:///test.db pytest
-ruff check .
+uv sync --extra dev --locked
+DATABASE_URL=sqlite:///test.db uv run pytest
+uv run ruff check .
 ```
 
 Frontend:
 
 ```sh
 cd frontend
-npm install
+npm ci
 npm run build
 ```
 

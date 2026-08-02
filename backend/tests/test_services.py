@@ -14,8 +14,11 @@ from app.services import calculate_score, haversine_km, select_locations
 def db():
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
-    with Session(engine) as session:
-        yield session
+    try:
+        with Session(engine) as session:
+            yield session
+    finally:
+        engine.dispose()
 
 
 def location(image_id: str) -> PlayableLocation:
