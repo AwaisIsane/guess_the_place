@@ -1,4 +1,4 @@
-FROM docker.io/library/node:24-alpine AS development
+FROM docker.io/library/node:25-alpine AS development
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
