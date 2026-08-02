@@ -1,5 +1,16 @@
 # WorldGuessr
 
+> **Prepare for the interview:** [Full-stack and cloud handbook](docs/README.md) — four
+> code-grounded chapters covering FastAPI, React, architecture/system design, and AWS/EKS,
+> with original visuals, answer frameworks, practice prompts, and authoritative external reading.
+
+Read it as a searchable documentation site:
+
+```sh
+npm install
+npm run docs:dev
+```
+
 A guest-only, five-round world exploration game built with Mapillary, MapLibre, FastAPI,
 PostgreSQL/PostGIS, Redis, and Caddy.
 
@@ -13,6 +24,17 @@ PostgreSQL/PostGIS, Redis, and Caddy.
 4. For a UI smoke test only, set `ALLOW_DEMO_CATALOG=true`, then seed:
    `podman compose run --rm backend python -m app.seed --demo`.
 5. Visit `http://localhost:3000`.
+
+For container-based development, run `npm run dev`. It starts the complete stack with bind-mounted
+source: Vite hot-updates frontend edits, while Uvicorn and the ARQ worker reload on backend edits.
+The development-only Caddy configuration permits the inline React-refresh preamble and WebSocket
+connections required by Vite; the stricter production CSP remains unchanged. The development stack
+stays attached so its logs are visible; Ctrl+C stops it.
+
+Use `npm run dev:clean` when you need a completely fresh build. It removes only this Compose
+project's containers, locally built images, and dependency-cache volume; clears generated
+frontend/Python caches; pulls fresh base images; rebuilds without the layer cache; and launches
+the same hot-reloading development stack. Persistent data in `.volumes/` is not removed.
 
 Demo records use placeholder image IDs, so they exercise gameplay but intentionally show an
 imagery placeholder. Production catalog ingestion must store validated Mapillary image and

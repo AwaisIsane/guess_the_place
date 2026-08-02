@@ -1,0 +1,12 @@
+images:
+  frontend: { repository: worldguessr/frontend, digest: "sha256:REPLACE" }
+  backend: { repository: worldguessr/backend, digest: "sha256:REPLACE" }
+replicas: 2
+secretStoreName: aws-secrets-manager
+remoteSecretKey: worldguessr-lab/application
+ingress:
+  enabled: true
+  certificateArn: ""
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits: { cpu: 500m, memory: 512Mi }

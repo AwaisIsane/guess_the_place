@@ -1,0 +1,17 @@
+{
+  "name": "worldguessr-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ops/dev.mjs",
+    "dev:clean": "node ops/dev.mjs --clean",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "mermaid": "^11.12.0",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.16"
+  }
+}

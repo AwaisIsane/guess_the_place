@@ -21,7 +21,10 @@ class Settings(BaseSettings):
     country_pool_target: int = 200
     recent_location_limit: int = 25
     rate_limit_per_minute: int = 120
-    allow_demo_catalog: bool = True
+    rate_limit_window_seconds: int = 60
+    rate_limit_fail_open: bool = True
+    telemetry_enabled: bool = True
+    allow_demo_catalog: bool = False
 
 
 @lru_cache

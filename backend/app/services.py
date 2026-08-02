@@ -27,13 +27,14 @@ def calculate_score(distance_km: float) -> int:
 def eligible_countries(db: Session) -> list[str]:
     settings = get_settings()
     minimum = settings.country_pool_minimum
+    real_only = bool(settings.mapillary_graph_token) or not settings.allow_demo_catalog
     stmt = (
         select(PlayableLocation.country_code)
         .where(PlayableLocation.status == LocationStatus.active)
         .group_by(PlayableLocation.country_code)
         .having(func.count() >= minimum)
     )
-    if settings.mapillary_graph_token:
+    if real_only:
         stmt = stmt.where(~PlayableLocation.image_id.like("demo-%"))
     return list(db.scalars(stmt))
 
@@ -42,6 +43,7 @@ def select_locations(db: Session, session_id: str, count: int = ROUNDS_PER_GAME)
     countries = eligible_countries(db)
     settings = get_settings()
     real_provider_ready = bool(settings.mapillary_graph_token)
+    real_only = real_provider_ready or not settings.allow_demo_catalog
     required = (
         1
         if settings.allow_demo_catalog or real_provider_ready
@@ -64,23 +66,23 @@ def select_locations(db: Session, session_id: str, count: int = ROUNDS_PER_GAME)
     random.shuffle(available_countries)
     for index in range(count):
         country = available_countries[index % len(available_countries)]
+        candidate_filters = [
+            PlayableLocation.country_code == country,
+            PlayableLocation.status == LocationStatus.active,
+        ]
+        if real_only:
+            candidate_filters.append(~PlayableLocation.image_id.like("demo-%"))
         candidates = list(
             db.scalars(
                 select(PlayableLocation).where(
-                    PlayableLocation.country_code == country,
-                    PlayableLocation.status == LocationStatus.active,
+                    *candidate_filters,
                     PlayableLocation.id.not_in(recent | {x.id for x in chosen}),
                 )
             )
         )
         if not candidates:
             candidates = list(
-                db.scalars(
-                    select(PlayableLocation).where(
-                        PlayableLocation.country_code == country,
-                        PlayableLocation.status == LocationStatus.active,
-                    )
-                )
+                db.scalars(select(PlayableLocation).where(*candidate_filters))
             )
         if not candidates:
             raise LookupError("No playable locations available")

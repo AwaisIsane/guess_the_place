@@ -11,3 +11,7 @@ __pycache__/
 .ruff_cache/
 *.py[cod]
 coverage.xml
+.vitepress/cache
+.vitepress/dist
+docs/.vitepress/cache
+docs/.vitepress/dist

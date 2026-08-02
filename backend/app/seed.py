@@ -20,15 +20,14 @@ CENTERS = {
     "ZA": (-33.9249, 18.4241),
 }
 
+
 def seed_demo(per_country: int = 25) -> int:
     inserted = 0
     with SessionLocal() as db:
         for country, (lat, lng) in CENTERS.items():
             for index in range(per_country):
                 image_id = f"demo-{country.lower()}-{index}"
-                existing = select(PlayableLocation.id).where(
-                    PlayableLocation.image_id == image_id
-                )
+                existing = select(PlayableLocation.id).where(PlayableLocation.image_id == image_id)
                 if db.scalar(existing):
                     continue
                 db.add(

@@ -84,6 +84,7 @@ class Round(Base):
     distance_km: Mapped[float | None] = mapped_column(Float)
     score: Mapped[int | None] = mapped_column(Integer)
     guessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    idempotency_key: Mapped[uuid.UUID | None] = mapped_column(unique=True)
     game: Mapped[Game] = relationship(back_populates="rounds")
     location: Mapped[PlayableLocation] = relationship()
 

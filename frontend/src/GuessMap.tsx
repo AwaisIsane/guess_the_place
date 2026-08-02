@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import maplibregl, { GeoJSONSource, Map } from "maplibre-gl";
+import maplibregl, { Map } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Coordinate, GuessResult } from "./types";
 
@@ -76,7 +76,8 @@ export function GuessMap({ styleUrl, value, result, onChange, interactive = true
         .extend([result.actual.longitude, result.actual.latitude]);
       map.fitBounds(bounds, { padding: 60, maxZoom: 8 });
     };
-    map.loaded() ? show() : map.once("load", show);
+    if (map.loaded()) show();
+    else map.once("load", show);
   }, [result]);
 
   return <div className="guess-map" ref={host} aria-label="World map" />;

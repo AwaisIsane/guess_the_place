@@ -1,0 +1,60 @@
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata: { name: worldguessr }
+spec:
+  refreshInterval: 1h
+  secretStoreRef: { name: {{ .Values.secretStoreName }}, kind: ClusterSecretStore }
+  target: { name: worldguessr-runtime }
+  dataFrom:
+    - extract: { key: {{ .Values.remoteSecretKey }} }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: backend }
+spec:
+  replicas: {{ .Values.replicas }}
+  selector: { matchLabels: { app: backend } }
+  template:
+    metadata: { labels: { app: backend } }
+    spec:
+      serviceAccountName: worldguessr
+      topologySpreadConstraints:
+        - { maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: { matchLabels: { app: backend } } }
+      containers:
+        - name: backend
+          image: "{{ .Values.images.backend.repository }}@{{ .Values.images.backend.digest }}"
+          ports: [{ name: http, containerPort: 8000 }]
+          envFrom: [{ secretRef: { name: worldguessr-runtime } }]
+          livenessProbe: { httpGet: { path: /health/live, port: http }, initialDelaySeconds: 10 }
+          readinessProbe: { httpGet: { path: /health/ready, port: http }, initialDelaySeconds: 10 }
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata: { name: backend }
+spec: { selector: { app: backend }, ports: [{ name: http, port: 8000, targetPort: http }] }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: worldguessr }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: backend }
+spec: { minAvailable: 1, selector: { matchLabels: { app: backend } } }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: backend }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: backend }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny-ingress }
+spec: { podSelector: {}, policyTypes: [Ingress] }

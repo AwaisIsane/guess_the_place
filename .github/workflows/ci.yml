@@ -1,33 +1,41 @@
 name: CI
 on:
-  push:
   pull_request:
+  push:
+    branches: [master]
+permissions: { contents: read }
 jobs:
-  backend:
+  application:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env: { POSTGRES_PASSWORD: test, POSTGRES_USER: worldguessr, POSTGRES_DB: worldguessr }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install -e 'backend[dev]'
-      - run: ruff check backend
-      - run: pytest backend
-        env:
-          DATABASE_URL: sqlite:///test.db
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
-      - run: npm install
+      - run: uv sync --project backend --extra dev --locked
+      - run: uv run --project backend ruff check backend/app backend/tests
+      - run: uv run pytest --cov=app
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://worldguessr:test@localhost/worldguessr
+          REDIS_URL: redis://localhost:6379/0
+      - run: npm ci && npm run lint && npm test && npm run build
         working-directory: frontend
-      - run: npm run build
-        working-directory: frontend
-  compose:
+      - run: make contract && git diff --exit-code
+  infrastructure:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y podman-compose
-      - run: cp .env.example .env
-      - run: podman-compose config
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive && terraform -chdir=infra/terraform init -backend=false && terraform -chdir=infra/terraform validate
+      - uses: azure/setup-helm@v4
+      - run: helm lint infra/helm/worldguessr && helm template test infra/helm/worldguessr >/tmp/rendered.yaml

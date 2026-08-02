@@ -1,25 +1,22 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useReducer, useState } from "react";
 import { api } from "./api";
-import { GuessMap } from "./GuessMap";
-import { MapillaryView } from "./MapillaryView";
-import type { Config, Coordinate, Game, GuessResult, Summary } from "./types";
+import { gameReducer, initialGameState } from "./gameMachine";
+import type { Config, Coordinate, GuessResult, Summary } from "./types";
 
+const GuessMap = lazy(() => import("./GuessMap").then((module) => ({ default: module.GuessMap })));
+const MapillaryView = lazy(() => import("./MapillaryView").then((module) => ({ default: module.MapillaryView })));
 const SAVED_GAME = "worldguessr.activeGame";
 
 export default function App() {
-  const [config, setConfig] = useState<Config | null>(null);
-  const [game, setGame] = useState<Game | null>(null);
-  const [guess, setGuess] = useState<Coordinate | null>(null);
-  const [result, setResult] = useState<GuessResult | null>(null);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [state, dispatch] = useReducer(gameReducer, initialGameState);
+  const { config, game, guess, result, summary, error } = state;
   const [mapOpen, setMapOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     api.config()
       .then(async (loadedConfig) => {
-        setConfig(loadedConfig);
+        dispatch({ type: "READY", config: loadedConfig });
         const id = localStorage.getItem(SAVED_GAME);
         if (!id) return;
         try {
@@ -31,27 +28,35 @@ export default function App() {
             localStorage.removeItem(SAVED_GAME);
             return;
           }
-          if (saved.status === "complete") return api.summary(id).then(setSummary);
-          setGame(saved);
+          if (saved.status === "complete") {
+            return api.summary(id).then((loaded) =>
+              dispatch({ type: "GAME_COMPLETED", summary: loaded }),
+            );
+          }
+          dispatch({ type: "GAME_STARTED", game: saved });
         } catch {
           localStorage.removeItem(SAVED_GAME);
         }
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => dispatch({ type: "FAILED", message: e.message }));
   }, []);
 
-  const choose = useCallback((coordinate: Coordinate) => setGuess(coordinate), []);
+  const choose = useCallback(
+    (coordinate: Coordinate) => dispatch({ type: "GUESS_PLACED", coordinate }),
+    [],
+  );
 
   async function start() {
     setBusy(true);
-    setError("");
     try {
       const created = await api.createGame();
-      setGame(created);
-      setSummary(null);
+      dispatch({ type: "GAME_STARTED", game: created });
       localStorage.setItem(SAVED_GAME, created.game_id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start a game");
+      dispatch({
+        type: "FAILED",
+        message: e instanceof Error ? e.message : "Could not start a game",
+      });
     } finally {
       setBusy(false);
     }
@@ -61,10 +66,16 @@ export default function App() {
     if (!game?.round || !guess) return;
     setBusy(true);
     try {
-      setResult(await api.guess(game.game_id, game.round.number, guess));
+      dispatch({
+        type: "GUESS_SCORED",
+        result: await api.guess(game.game_id, game.round.number, guess),
+      });
       setMapOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not submit guess");
+      dispatch({
+        type: "FAILED",
+        message: e instanceof Error ? e.message : "Could not submit guess",
+      });
     } finally {
       setBusy(false);
     }
@@ -73,13 +84,10 @@ export default function App() {
   async function advance() {
     if (!game || !result) return;
     if (result.game_complete) {
-      setSummary(await api.summary(game.game_id));
-      setGame(null);
+      dispatch({ type: "GAME_COMPLETED", summary: await api.summary(game.game_id) });
     } else {
-      setGame(await api.game(game.game_id));
+      dispatch({ type: "ROUND_ADVANCED", game: await api.game(game.game_id) });
     }
-    setGuess(null);
-    setResult(null);
     setMapOpen(false);
   }
 
@@ -90,10 +98,9 @@ export default function App() {
 
   return (
     <main className="game-screen">
-      <MapillaryView
-        imageId={game.round.image_id}
-        accessToken={config.mapillary_client_token}
-      />
+      <Suspense fallback={<div className="loading" role="status">Loading street view…</div>}>
+        <MapillaryView imageId={game.round.image_id} accessToken={config.mapillary_client_token} />
+      </Suspense>
       <header className="hud">
         <div className="brand-mini"><span>W</span> WorldGuessr</div>
         <div className="progress">
@@ -108,12 +115,14 @@ export default function App() {
         <button className="map-toggle" onClick={() => setMapOpen(!mapOpen)}>
           {mapOpen ? "Close map" : "Place your guess"}
         </button>
-        <GuessMap styleUrl={config.map_style_url} value={guess} onChange={choose} />
+        <Suspense fallback={<div className="loading" role="status">Loading map…</div>}>
+          <GuessMap styleUrl={config.map_style_url} value={guess} onChange={choose} />
+        </Suspense>
         <button className="primary guess-button" disabled={!guess || busy} onClick={submit}>
           {guess ? "Lock in guess" : "Choose a location"}
         </button>
       </section>
-      {error && <div className="toast">{error}</div>}
+      {error && <div className="toast" role="alert" aria-live="assertive">{error}</div>}
     </main>
   );
 }
@@ -149,7 +158,7 @@ function Landing({ start, busy, error }: { start: () => void; busy: boolean; err
 function RoundResult({ result, config, advance }: { result: GuessResult; config: Config; advance: () => void }) {
   return (
     <main className="result-screen">
-      <div className="result-map"><GuessMap styleUrl={config.map_style_url} value={result.guess} result={result} interactive={false} /></div>
+      <div className="result-map"><Suspense fallback={<div role="status">Loading result map…</div>}><GuessMap styleUrl={config.map_style_url} value={result.guess} result={result} interactive={false} /></Suspense></div>
       <section className="result-card">
         <div className="eyebrow">Round {result.round} complete</div>
         <h2>{result.score.toLocaleString()} <small>points</small></h2>

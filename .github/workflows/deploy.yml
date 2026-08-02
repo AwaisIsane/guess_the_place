@@ -1,0 +1,33 @@
+name: Manual AWS deployment
+on:
+  workflow_dispatch:
+    inputs:
+      action: { description: Action, type: choice, options: [plan, apply, deploy, destroy], required: true }
+      image_digest: { description: Immutable backend/frontend sha256 digest, required: false }
+permissions: { id-token: write, contents: read }
+jobs:
+  deploy:
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra/terraform init
+      - if: inputs.action == 'plan'
+        run: terraform -chdir=infra/terraform plan
+      - if: inputs.action == 'apply'
+        run: terraform -chdir=infra/terraform apply -auto-approve
+      - if: inputs.action == 'destroy'
+        run: terraform -chdir=infra/terraform destroy -auto-approve
+      - uses: azure/setup-helm@v4
+        if: inputs.action == 'deploy'
+      - if: inputs.action == 'deploy'
+        run: |
+          aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER }}"
+          helm upgrade --install worldguessr infra/helm/worldguessr -n worldguessr --create-namespace \
+            --set images.backend.digest="${{ inputs.image_digest }}" \
+            --set images.frontend.digest="${{ inputs.image_digest }}"

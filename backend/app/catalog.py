@@ -64,10 +64,7 @@ async def fetch_images(bbox: str, after: str | None = None) -> dict:
 
 
 def _bbox(latitude: float, longitude: float, radius: float = 0.001) -> str:
-    return (
-        f"{longitude - radius},{latitude - radius},"
-        f"{longitude + radius},{latitude + radius}"
-    )
+    return f"{longitude - radius},{latitude - radius},{longitude + radius},{latitude + radius}"
 
 
 async def discover_country(country: str, latitude: float, longitude: float) -> list[dict]:
@@ -122,9 +119,10 @@ async def refill_catalog(ctx=None) -> int:
                     db.add(location)
                     inserted += 1
                 sequence = image.get("sequence")
-                location.sequence_id = str(
-                    sequence.get("id") if isinstance(sequence, dict) else sequence or ""
-                ) or None
+                location.sequence_id = (
+                    str(sequence.get("id") if isinstance(sequence, dict) else sequence or "")
+                    or None
+                )
                 location.country_code = country
                 location.longitude = coordinates[0]
                 location.latitude = coordinates[1]
@@ -141,8 +139,7 @@ async def refill_catalog(ctx=None) -> int:
         rebuild_catalog_counts(db)
 
         eligible = db.scalar(
-            select(func.count())
-            .select_from(
+            select(func.count()).select_from(
                 select(PlayableLocation.country_code)
                 .where(
                     PlayableLocation.status == LocationStatus.active,
@@ -176,6 +173,7 @@ async def refill_catalog(ctx=None) -> int:
 async def cleanup_expired(ctx):
     with SessionLocal() as db:
         from .models import Game
+
         result = db.execute(delete(Game).where(Game.expires_at < datetime.now(UTC)))
         db.commit()
         return result.rowcount
