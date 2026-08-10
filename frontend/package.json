@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "mapillary-js": "^4.1.2",
-    "maplibre-gl": "^6.1.0",
+    "maplibre-gl": "^6.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
@@ -33,8 +33,8 @@
     "jsdom": "^30.0.1",
     "openapi-typescript": "7.13.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.65.0",
-    "vite": "^8.2.0",
+    "typescript-eslint": "^8.66.0",
+    "vite": "^8.2.1",
     "vitest": "^4.1.10"
   }
 }
