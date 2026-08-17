@@ -3,20 +3,20 @@ name = "worldguessr-backend"
 version = "0.1.0"
 requires-python = ">=3.14,<3.15"
 dependencies = [
-  "alembic>=1.18,<2",
+  "alembic>=1.19.1,<2",
   "arq>=0.28,<1",
   "fastapi>=0.141,<1",
   "httpx>=0.28,<1",
   "itsdangerous>=2.2,<3",
   "psycopg[binary]>=3.3,<4",
-  "pydantic-settings>=2.14,<3",
+  "pydantic-settings>=2.15.0,<3",
   "redis>=5.3,<6",
-  "sqlalchemy>=2.0.51,<3",
+  "sqlalchemy>=2.0.52,<3",
   "uvicorn[standard]>=0.52,<1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.1,<10", "pytest-cov>=7.1,<8", "ruff>=0.16,<1"]
+dev = ["pytest>=9.1,<10", "pytest-cov>=7.1,<8", "ruff>=0.16.3,<1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
