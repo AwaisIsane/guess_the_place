@@ -103,7 +103,7 @@ services:
     networks: [internal]
 
   redis:
-    image: docker.io/valkey/valkey:9.1.1-alpine
+    image: docker.io/valkey/valkey:9.1.2-alpine
     restart: unless-stopped
     command: ["valkey-server", "--appendonly", "yes", "--maxmemory", "192mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
