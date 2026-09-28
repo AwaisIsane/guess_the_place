@@ -8,7 +8,7 @@ locals {
 
 module "vpc" {
   source                 = "terraform-aws-modules/vpc/aws"
-  version                = "6.6.1"
+  version                = "6.7.3"
   name                   = local.name
   cidr                   = var.vpc_cidr
   azs                    = local.azs
@@ -25,7 +25,7 @@ module "vpc" {
 
 module "eks" {
   source                                   = "terraform-aws-modules/eks/aws"
-  version                                  = "21.24.0"
+  version                                  = "21.26.0"
   name                                     = local.name
   kubernetes_version                       = "1.36"
   endpoint_public_access                   = true
